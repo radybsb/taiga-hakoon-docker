@@ -128,8 +128,10 @@ and persistence after restart. Check that production still serves its own data.
 In `taiga-hakoon-docker`, create a GitHub Environment named `homolog`, restricted
 to reviewed `main`/`develop` refs and with any desired approval protection.
 Configure its variables `SSH_HOST` (real hostname/IP, not the local `hakoon` alias)
-and `SSH_USER`. Configure secrets `SSH_PRIVATE_KEY` (dedicated deployment key) and
+and `SSH_USER`, plus `SSH_PORT` (57726 on the current VPS; defaults to 22).
+Configure secrets `SSH_PRIVATE_KEY` (dedicated deployment key) and
 `SSH_KNOWN_HOSTS` (host key independently verified against the VPS).
+For a nonstandard port, the known-host entry must match `[hostname]:port`.
 Do not disable SSH host-key checking. Provisioning a deploy identity with Docker
 access is privileged and must be performed deliberately by the operator.
 

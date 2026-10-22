@@ -43,14 +43,17 @@ jobs:
         env:
           SSH_HOST: ${{ vars.SSH_HOST }}
           SSH_USER: ${{ vars.SSH_USER }}
+          SSH_PORT: ${{ vars.SSH_PORT || '22' }}
           FRONTEND_IMAGE: ${{ inputs.frontend_image }}
           BACKEND_IMAGE: ${{ inputs.backend_image }}
         shell: bash
         run: |
           [[ "$SSH_HOST" =~ ^[a-zA-Z0-9.-]+$ ]]
           [[ "$SSH_USER" =~ ^[a-zA-Z0-9_-]+$ ]]
+          [[ "$SSH_PORT" =~ ^[0-9]{1,5}$ ]]
+          (( 10#$SSH_PORT >= 1 && 10#$SSH_PORT <= 65535 ))
           target="$SSH_USER@$SSH_HOST"
           archive="homolog-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.tar.gz"
           tar -czf "$RUNNER_TEMP/$archive" deploy/homolog/compose.yml deploy/homolog/gateway.conf deploy/homolog/bootstrap.sh deploy/homolog/deploy.sh
-          scp -o StrictHostKeyChecking=yes "$RUNNER_TEMP/$archive" "$target:/tmp/$archive"
-          ssh -o StrictHostKeyChecking=yes "$target" "set -eu; test -d /opt/taiga/taiga-hakoon-docker; tar -xzf /tmp/$archive -C /opt/taiga/taiga-hakoon-docker; rm /tmp/$archive; bash /opt/taiga/taiga-hakoon-docker/deploy/homolog/deploy.sh '$FRONTEND_IMAGE' '$BACKEND_IMAGE'"
+          scp -P "$SSH_PORT" -o StrictHostKeyChecking=yes "$RUNNER_TEMP/$archive" "$target:/tmp/$archive"
+          ssh -p "$SSH_PORT" -o StrictHostKeyChecking=yes "$target" "set -eu; test -d /opt/taiga/taiga-hakoon-docker; tar -xzf /tmp/$archive -C /opt/taiga/taiga-hakoon-docker; rm /tmp/$archive; bash /opt/taiga/taiga-hakoon-docker/deploy/homolog/deploy.sh '$FRONTEND_IMAGE' '$BACKEND_IMAGE'"
