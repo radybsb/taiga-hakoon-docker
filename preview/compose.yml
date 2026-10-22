@@ -1,0 +1,36 @@
+# Standalone project: never combine this with the production compose file.
+name: taiga-preview
+services:
+  frontend:
+    image: ${FRONTEND_IMAGE:?Set a versioned FRONTEND_IMAGE in preview/.env}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${PREVIEW_PORT:-9002}:80"
+    environment:
+      TAIGA_URL: ""
+      TAIGA_SUBPATH: ""
+      TAIGA_WEBSOCKETS_URL: "wss://${PREVIEW_DOMAIN:-taiga-homolog.hakoongames.com}"
+      ENABLE_EVENTS: "${ENABLE_EVENTS:-false}"
+      DEFAULT_LANGUAGE: "${DEFAULT_LANGUAGE:-en}"
+      PUBLIC_REGISTER_ENABLED: "false"
+      DEBUG: "false"
+      PREVIEW_BACKEND_HOST: "${PRODUCTION_DOMAIN:-taiga.hakoongames.com}"
+      PREVIEW_GATEWAY: "${PRODUCTION_GATEWAY:-taiga-gateway}"
+      NGINX_ENVSUBST_FILTER: "^PREVIEW_"
+    volumes:
+      - ./nginx-preview.conf.template:/etc/nginx/templates/default.conf.template:ro
+    networks:
+      - production
+    mem_limit: 128m
+    cpus: 0.5
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+networks:
+  production:
+    external: true
+    name: ${PRODUCTION_NETWORK:-taiga-docker_taiga}

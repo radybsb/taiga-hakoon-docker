@@ -1,0 +1,56 @@
+name: Deploy isolated homolog
+on:
+  workflow_dispatch:
+    inputs:
+      frontend_image:
+        description: 'Tested ghcr.io/radybsb/taiga-hakoon-front:sha-<commit>-<run>-<attempt>'
+        required: true
+        type: string
+      backend_image:
+        description: 'Tested ghcr.io/radybsb/taiga-hakoon-back:sha-<commit>-<run>-<attempt>'
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: deploy-homolog
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    environment: homolog
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate image identifiers
+        env:
+          FRONTEND_IMAGE: ${{ inputs.frontend_image }}
+          BACKEND_IMAGE: ${{ inputs.backend_image }}
+        shell: bash
+        run: |
+          [[ "$FRONTEND_IMAGE" =~ ^ghcr\.io/radybsb/taiga-hakoon-front:sha-[a-f0-9]{40}-[0-9]+-[0-9]+$ ]]
+          [[ "$BACKEND_IMAGE" =~ ^ghcr\.io/radybsb/taiga-hakoon-back:sha-[a-f0-9]{40}-[0-9]+-[0-9]+$ ]]
+      - name: Configure SSH
+        env:
+          DEPLOY_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+        run: |
+          umask 077
+          mkdir -p ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/id_ed25519
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+      - name: Upload configuration and deploy tested images
+        env:
+          SSH_HOST: ${{ vars.SSH_HOST }}
+          SSH_USER: ${{ vars.SSH_USER }}
+          FRONTEND_IMAGE: ${{ inputs.frontend_image }}
+          BACKEND_IMAGE: ${{ inputs.backend_image }}
+        shell: bash
+        run: |
+          [[ "$SSH_HOST" =~ ^[a-zA-Z0-9.-]+$ ]]
+          [[ "$SSH_USER" =~ ^[a-zA-Z0-9_-]+$ ]]
+          target="$SSH_USER@$SSH_HOST"
+          archive="homolog-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.tar.gz"
+          tar -czf "$RUNNER_TEMP/$archive" deploy/homolog/compose.yml deploy/homolog/gateway.conf deploy/homolog/bootstrap.sh deploy/homolog/deploy.sh
+          scp -o StrictHostKeyChecking=yes "$RUNNER_TEMP/$archive" "$target:/tmp/$archive"
+          ssh -o StrictHostKeyChecking=yes "$target" "set -eu; test -d /opt/taiga/taiga-hakoon-docker; tar -xzf /tmp/$archive -C /opt/taiga/taiga-hakoon-docker; rm /tmp/$archive; bash /opt/taiga/taiga-hakoon-docker/deploy/homolog/deploy.sh '$FRONTEND_IMAGE' '$BACKEND_IMAGE'"

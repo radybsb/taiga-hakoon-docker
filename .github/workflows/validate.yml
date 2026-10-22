@@ -1,0 +1,19 @@
+name: Validate deployment configuration
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python deploy/homolog/validate.py
+      - run: bash -n deploy/homolog/bootstrap.sh deploy/homolog/deploy.sh

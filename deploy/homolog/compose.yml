@@ -1,0 +1,223 @@
+# Standalone environment. Never combine with production Compose files.
+name: taiga-homolog
+services:
+  taiga-db:
+    image: ${POSTGRES_IMAGE:?Pin the existing PostgreSQL image}
+    restart: unless-stopped
+    mem_limit: 256m
+    networks:
+    - taiga
+    logging: &id001
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+    environment:
+      POSTGRES_DB: taiga_homolog
+      POSTGRES_USER: taiga_homolog
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    volumes:
+    - taiga-db-data:/var/lib/postgresql/data
+    command:
+    - postgres
+    - -c
+    - shared_buffers=64MB
+    - -c
+    - max_connections=40
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -U taiga_homolog -d taiga_homolog
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  taiga-async-rabbitmq:
+    image: ${RABBITMQ_IMAGE:?Pin the existing RabbitMQ image}
+    restart: unless-stopped
+    mem_limit: 192m
+    networks:
+    - taiga
+    logging: *id001
+    environment:
+      RABBITMQ_DEFAULT_USER: taiga_homolog
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS}
+      RABBITMQ_DEFAULT_VHOST: taiga
+      RABBITMQ_ERLANG_COOKIE: ${RABBITMQ_ERLANG_COOKIE}
+      RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: +S 1:1
+    healthcheck:
+      test:
+      - CMD
+      - rabbitmq-diagnostics
+      - -q
+      - ping
+      interval: 15s
+      timeout: 10s
+      retries: 15
+      start_period: 30s
+    hostname: taiga-async-rabbitmq
+    volumes:
+    - taiga-async-rabbitmq-data:/var/lib/rabbitmq
+  taiga-events-rabbitmq:
+    image: ${RABBITMQ_IMAGE:?Pin the existing RabbitMQ image}
+    restart: unless-stopped
+    mem_limit: 192m
+    networks:
+    - taiga
+    logging: *id001
+    environment:
+      RABBITMQ_DEFAULT_USER: taiga_homolog
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS}
+      RABBITMQ_DEFAULT_VHOST: taiga
+      RABBITMQ_ERLANG_COOKIE: ${RABBITMQ_ERLANG_COOKIE}
+      RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: +S 1:1
+    healthcheck:
+      test:
+      - CMD
+      - rabbitmq-diagnostics
+      - -q
+      - ping
+      interval: 15s
+      timeout: 10s
+      retries: 15
+      start_period: 30s
+    hostname: taiga-events-rabbitmq
+    volumes:
+    - taiga-events-rabbitmq-data:/var/lib/rabbitmq
+  taiga-back:
+    image: ${BACKEND_IMAGE:?Set an immutable backend image}
+    restart: unless-stopped
+    mem_limit: 384m
+    networks:
+    - taiga
+    logging: *id001
+    environment: &id002
+      POSTGRES_DB: taiga_homolog
+      POSTGRES_USER: taiga_homolog
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      POSTGRES_HOST: taiga-db
+      TAIGA_SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY}
+      TAIGA_SITES_SCHEME: https
+      TAIGA_SITES_DOMAIN: ${TAIGA_DOMAIN:-taiga-homolog.hakoongames.com}
+      TAIGA_SUBPATH: ''
+      EMAIL_BACKEND: django.core.mail.backends.console.EmailBackend
+      ENABLE_TELEMETRY: 'False'
+      WEBHOOKS_ENABLED: 'False'
+      RABBITMQ_USER: taiga_homolog
+      RABBITMQ_PASS: ${RABBITMQ_PASS:?Set RABBITMQ_PASS}
+      CELERY_TIMEZONE: America/Vancouver
+      UNSPLASH_ACCESS_KEY: ${UNSPLASH_ACCESS_KEY:-}
+    volumes: &id003
+    - taiga-static-data:/taiga-back/static
+    - taiga-media-data:/taiga-back/media
+    command:
+    - --workers
+    - '1'
+    depends_on:
+      taiga-db:
+        condition: service_healthy
+      taiga-async-rabbitmq:
+        condition: service_healthy
+      taiga-events-rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test:
+      - CMD
+      - python
+      - -c
+      - import socket; socket.create_connection(('127.0.0.1',8000),3).close()
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+  taiga-async:
+    image: ${BACKEND_IMAGE:?Set an immutable backend image}
+    restart: unless-stopped
+    mem_limit: 256m
+    networks:
+    - taiga
+    logging: *id001
+    environment: *id002
+    volumes: *id003
+    entrypoint:
+    - /taiga-back/docker/async_entrypoint.sh
+    command:
+    - --concurrency
+    - '1'
+    depends_on:
+      taiga-back:
+        condition: service_healthy
+  taiga-front:
+    image: ${FRONTEND_IMAGE:?Set an immutable frontend image}
+    restart: unless-stopped
+    mem_limit: 64m
+    networks:
+    - taiga
+    logging: *id001
+    environment:
+      TAIGA_URL: ''
+      TAIGA_SUBPATH: ''
+      TAIGA_WEBSOCKETS_URL: wss://${TAIGA_DOMAIN:-taiga-homolog.hakoongames.com}
+      DEFAULT_LANGUAGE: en
+      PUBLIC_REGISTER_ENABLED: 'false'
+      ENABLE_EVENTS: 'true'
+      DEBUG: 'false'
+      NGINX_ENTRYPOINT_WORKER_PROCESSES_AUTOTUNE: 'false'
+    command:
+    - nginx
+    - -g
+    - daemon off;
+  taiga-events:
+    image: ${EVENTS_IMAGE:?Pin the existing events image}
+    restart: unless-stopped
+    mem_limit: 96m
+    networks:
+    - taiga
+    logging: *id001
+    environment:
+      RABBITMQ_USER: taiga_homolog
+      RABBITMQ_PASS: ${RABBITMQ_PASS}
+      TAIGA_SECRET_KEY: ${SECRET_KEY}
+    depends_on:
+      taiga-events-rabbitmq:
+        condition: service_healthy
+  taiga-protected:
+    image: ${PROTECTED_IMAGE:?Pin the existing protected image}
+    restart: unless-stopped
+    mem_limit: 128m
+    networks:
+    - taiga
+    logging: *id001
+    environment:
+      MAX_AGE: '360'
+      SECRET_KEY: ${SECRET_KEY}
+  taiga-gateway:
+    image: ${GATEWAY_IMAGE:?Pin the existing gateway image}
+    restart: unless-stopped
+    mem_limit: 32m
+    networks:
+    - taiga
+    logging: *id001
+    ports:
+    - 127.0.0.1:${HOMOLOG_PORT:-9002}:80
+    volumes:
+    - ./gateway.conf:/etc/nginx/conf.d/default.conf:ro
+    - taiga-static-data:/taiga/static:ro
+    - taiga-media-data:/taiga/media:ro
+    depends_on:
+      taiga-back:
+        condition: service_healthy
+      taiga-front:
+        condition: service_healthy
+      taiga-events:
+        condition: service_started
+      taiga-protected:
+        condition: service_started
+volumes:
+  taiga-db-data: null
+  taiga-static-data: null
+  taiga-media-data: null
+  taiga-async-rabbitmq-data: null
+  taiga-events-rabbitmq-data: null
+networks:
+  taiga:
+    driver: bridge
