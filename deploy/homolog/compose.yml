@@ -106,6 +106,9 @@ services:
       RABBITMQ_PASS: ${RABBITMQ_PASS:?Set RABBITMQ_PASS}
       CELERY_TIMEZONE: America/Vancouver
       UNSPLASH_ACCESS_KEY: ${UNSPLASH_ACCESS_KEY:-}
+      HAKOON_ENVIRONMENT: homolog
+      SEED_TEST_USERS_ENABLED: ${SEED_TEST_USERS_ENABLED:-False}
+      TEST_USERS_PASSWORD: ${TEST_USERS_PASSWORD:-}
     volumes: &id003
     - taiga-static-data:/taiga-back/static
     - taiga-media-data:/taiga-back/media

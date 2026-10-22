@@ -21,6 +21,8 @@ done
     printf 'RABBITMQ_PASS=%s\n' "$(openssl rand -hex 32)"
     printf 'RABBITMQ_ERLANG_COOKIE=%s\n' "$(openssl rand -hex 32)"
     echo 'UNSPLASH_ACCESS_KEY='
+    echo 'SEED_TEST_USERS_ENABLED=True'
+    printf 'TEST_USERS_PASSWORD=%s\n' "$(openssl rand -hex 24)"
     printf 'POSTGRES_IMAGE=%s\n' "$postgres_image"
     printf 'RABBITMQ_IMAGE=%s\n' "$rabbit_image"
     printf 'EVENTS_IMAGE=%s\n' "$events_image"

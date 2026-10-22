@@ -125,6 +125,42 @@ and persistence after restart. Check that production still serves its own data.
 
 ## CD through GitHub Actions
 
+### Test users on deployment
+
+New bootstraps enable test-user seeding and generate an initial password privately
+in `.env`. For an existing homolog installation, add the following to that file:
+
+```dotenv
+SEED_TEST_USERS_ENABLED=True
+TEST_USERS_PASSWORD=<a password of at least 12 characters>
+```
+
+Use a new backend image containing the `seed_test_users` command. Keep the password
+in the VPS `.env`, never in GitHub workflow inputs or chat. The deploy script calls
+`python manage.py seed_test_users` after migrations and Django checks whenever the
+flag is enabled. It creates `test.alex` (Alex Morgan), `test.jamie` (Jamie Chen) and
+`test.sam` (Sam Taylor), with reserved `@homolog.invalid` email addresses. These are
+active regular users, without staff/admin privileges. Project membership remains
+an explicit choice in the app; no production projects or administrator accounts
+are modified.
+
+The initial password is shared by these three fictional test accounts. Rerunning
+the command preserves existing passwords and other account edits. If a test
+account is deleted it is recreated on the next enabled deploy. Matching names
+with conflicting emails, or emails owned by another username, stop the command
+without partial creation. Disabling seeding prevents future creations; it does
+not delete accounts. The command refuses environments other than `homolog`.
+
+To run it manually after deploying the new image:
+
+```bash
+cd /opt/taiga/taiga-hakoon-docker/deploy/homolog
+docker compose -p taiga-homolog --env-file .env --env-file .release.env \
+  -f compose.yml exec taiga-back python manage.py seed_test_users
+```
+
+### Configure the deployment identity
+
 In `taiga-hakoon-docker`, create a GitHub Environment named `homolog`, restricted
 to reviewed `main`/`develop` refs and with any desired approval protection.
 Configure its variables `SSH_HOST` (real hostname/IP, not the local `hakoon` alias)

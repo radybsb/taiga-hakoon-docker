@@ -32,5 +32,7 @@ api = config['services']['taiga-back']['environment']
 assert api['POSTGRES_HOST'] == 'taiga-db' and api['POSTGRES_DB'] == 'taiga_homolog'
 assert api['EMAIL_BACKEND'] == 'django.core.mail.backends.console.EmailBackend'
 assert api['WEBHOOKS_ENABLED'] == 'False'
+assert api['HAKOON_ENVIRONMENT'] == 'homolog'
+assert api['SEED_TEST_USERS_ENABLED'] == 'False'
 assert config['services']['taiga-back']['image'] == config['services']['taiga-async']['image']
 print('PASS: nine services isolated from production; bounded memory, internal DB, console email, loopback gateway, matched backend/worker images')

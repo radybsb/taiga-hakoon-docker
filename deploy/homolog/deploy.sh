@@ -36,6 +36,10 @@ if [[ -s .release.env ]]; then cp .release.env "backups/$stamp.release.env"; fi
 "${compose[@]}" stop taiga-async
 "${compose[@]}" up -d --no-deps --wait --wait-timeout 600 taiga-back
 "${compose[@]}" exec -T taiga-back python manage.py check
+seed_enabled=$("${compose[@]}" exec -T taiga-back python -c 'import os; print(os.getenv("SEED_TEST_USERS_ENABLED", "False").lower())')
+if [[ "$seed_enabled" == true ]]; then
+    "${compose[@]}" exec -T taiga-back python manage.py seed_test_users
+fi
 "${compose[@]}" up -d --no-deps --wait --wait-timeout 180 taiga-front taiga-async taiga-events taiga-protected
 "${compose[@]}" up -d --no-deps --force-recreate taiga-gateway
 "${compose[@]}" exec -T taiga-gateway nginx -t
