@@ -21,7 +21,7 @@ jobs:
     environment: homolog
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Validate image identifiers
         env:
           FRONTEND_IMAGE: ${{ inputs.frontend_image }}
