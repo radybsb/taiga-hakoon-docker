@@ -56,9 +56,9 @@ services:
 
   taiga-back:
     build: 
-      context: ../taiga-back
+      context: ../taiga-hakoon-back
       dockerfile: docker/Dockerfile
-    image: hakoon/taiga-back:preview-20261017-01
+    image: hakoon/taiga-back:local-dev
     environment: *default-back-environment
     volumes: *default-back-volumes
     networks:
@@ -72,7 +72,7 @@ services:
         condition: service_started
 
   taiga-async:
-    image: hakoon/taiga-back:preview-20261017-01
+    image: hakoon/taiga-back:local-dev
     entrypoint: ["/taiga-back/docker/async_entrypoint.sh"]
     environment: *default-back-environment
     volumes: *default-back-volumes
